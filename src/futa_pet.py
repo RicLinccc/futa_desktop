@@ -1166,9 +1166,9 @@ class FutaPet:
                 pass
             self._viewfinder = None
 
-        title = tk.Label(canvas, text="取景框 · 拖边框移动 · 拖四角改大小", bg=dark,
+        title = tk.Label(canvas, text="取景框", bg=dark,
                          fg="#F2E9EC", font=("Microsoft YaHei UI", 10, "bold"))
-        hint = tk.Label(canvas, text="中间就是实时桌面", bg=dark, fg="#8C7B82",
+        hint = tk.Label(canvas, text="拖边框移动 · 拖四角缩放", bg=dark, fg="#8C7B82",
                         font=("Microsoft YaHei UI", 9))
         title_item = canvas.create_window(36, 10, window=title, anchor="nw")
         hint_item = canvas.create_window(36, 32, window=hint, anchor="nw")
@@ -1219,8 +1219,8 @@ class FutaPet:
                 if "n" in corner:
                     h = h - dy
                 left, top, right, bottom = self.work_area()
-                w = max(320, min(w, right - left))
-                h = max(300, min(h, bottom - top))
+                w = max(420, min(w, right - left))
+                h = max(320, min(h, bottom - top))
                 if "w" in corner:
                     x = resize["left"] + resize["w"] - w
                 if "n" in corner:
