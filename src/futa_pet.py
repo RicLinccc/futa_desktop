@@ -103,7 +103,7 @@ THEMES = {
         "name": "睡衣女孩",
         "asset": "pajama-girl.png",
         "wings": False,
-        "mouth": (94, 256),
+        "mouth": (146, 352),
     },
 }
 
