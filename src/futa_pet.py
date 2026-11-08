@@ -158,6 +158,17 @@ PHOTO_TEMPLATES = {
 }
 
 
+# 主题专属的单击台词：有就用，没有就走通用池。
+THEME_SAYINGS = {
+    "girl": (
+        "屏幕不断电我尽兴游玩~",
+        "爱是个 最深奥 的问题~",
+        "I will be right here waiting for you~",
+        "可是你还记得吗\n那年盛夏 那个傻瓜\n说的傻话~",
+    ),
+}
+
+
 def pictures_dir() -> Path:
     root = Path(os.environ.get("USERPROFILE", str(Path.home()))) / "Pictures"
     return root / "福塔相册"
@@ -1125,7 +1136,7 @@ class FutaPet:
         return img.convert("RGBA")
 
     def open_viewfinder(self) -> None:
-        """取景框：中间透明看到实时桌面，拖动移动，拖四角自由改大小。"""
+        """取景框：顶部是明确的拖动条，四角可缩放，中间透明实时看桌面。"""
         self.hide_bubble()
         if getattr(self, "_viewfinder", None) is not None:
             try:
@@ -1140,10 +1151,12 @@ class FutaPet:
         cap_w = 560
         cap_h = int(round(cap_w / aspect))
         border = 34
-        bar = 56
+        bar_top = 68
+        bar_bottom = 64
         win_w = cap_w + border * 2
-        win_h = bar + cap_h + border
+        win_h = bar_top + cap_h + bar_bottom
         dark = "#1E1A1D"
+        grip_dark = "#3A3034"
         window = tk.Toplevel(self.root)
         window.overrideredirect(True)
         window.attributes("-topmost", True)
@@ -1155,9 +1168,9 @@ class FutaPet:
         state = {"w": win_w, "h": win_h}
 
         def shoot():
-            self.shoot_viewfinder(window, border, bar,
+            self.shoot_viewfinder(window, border, bar_top,
                                   max(80, state["w"] - border * 2),
-                                  max(80, state["h"] - bar - border))
+                                  max(80, state["h"] - bar_top - bar_bottom))
 
         def cancel():
             try:
@@ -1166,29 +1179,28 @@ class FutaPet:
                 pass
             self._viewfinder = None
 
-        title = tk.Label(canvas, text="取景框", bg=dark,
-                         fg="#F2E9EC", font=("Microsoft YaHei UI", 10, "bold"))
-        hint = tk.Label(canvas, text="拖边框移动 · 拖四角缩放", bg=dark, fg="#8C7B82",
-                        font=("Microsoft YaHei UI", 9))
-        title_item = canvas.create_window(36, 10, window=title, anchor="nw")
-        hint_item = canvas.create_window(36, 32, window=hint, anchor="nw")
+        # 顶部：明确的拖动条
+        grip_bg = canvas.create_rectangle(0, 0, 1, 1, fill=grip_dark, outline="")
+        grip_text = canvas.create_text(0, 0, text="≡  按住这里拖动取景框",
+                                       fill="#FFFFFF", font=("Microsoft YaHei UI", 11, "bold"))
+        grip_hint = canvas.create_text(0, 0, text="拖四角粉色方块改大小 · 中间就是实时桌面",
+                                       fill="#B9A9B0", font=("Microsoft YaHei UI", 9))
+        # 底部按钮
         shot_btn = tk.Button(canvas, text="快门", command=shoot, relief="flat", bd=0,
                              bg="#EA7BAC", fg="#FFFFFF", activebackground="#D46698",
-                             activeforeground="#FFFFFF", padx=16, pady=3,
-                             font=("Microsoft YaHei UI", 9, "bold"))
+                             activeforeground="#FFFFFF", padx=22, pady=5,
+                             font=("Microsoft YaHei UI", 10, "bold"))
         cancel_btn = tk.Button(canvas, text="取消", command=cancel, relief="flat", bd=0,
                                bg="#3A3034", fg="#F2E9EC", activebackground="#4A3C42",
-                               activeforeground="#FFFFFF", padx=10, pady=3,
-                               font=("Microsoft YaHei UI", 9))
+                               activeforeground="#FFFFFF", padx=14, pady=5,
+                               font=("Microsoft YaHei UI", 10))
         shot_item = canvas.create_window(0, 0, window=shot_btn, anchor="center")
         cancel_item = canvas.create_window(0, 0, window=cancel_btn, anchor="center")
         strips = [canvas.create_rectangle(0, 0, 1, 1, fill=dark, outline="") for _ in range(4)]
         handles = {}
-        for name, (hx, hy) in {"nw": (8, 8), "ne": (win_w - 8, 8),
-                               "sw": (8, win_h - 8), "se": (win_w - 8, win_h - 8)}.items():
-            item = canvas.create_rectangle(hx - 9, hy - 9, hx + 9, hy + 9,
-                                           fill="#EA7BAC", outline="#FFFFFF", width=2)
-            handles[name] = item
+        for name in ("nw", "ne", "sw", "se"):
+            handles[name] = canvas.create_rectangle(0, 0, 0, 0, fill="#EA7BAC",
+                                                    outline="#FFFFFF", width=2)
 
         move = {"dx": 0, "dy": 0}
         def start_move(event):
@@ -1220,7 +1232,7 @@ class FutaPet:
                     h = h - dy
                 left, top, right, bottom = self.work_area()
                 w = max(420, min(w, right - left))
-                h = max(320, min(h, bottom - top))
+                h = max(360, min(h, bottom - top))
                 if "w" in corner:
                     x = resize["left"] + resize["w"] - w
                 if "n" in corner:
@@ -1235,6 +1247,9 @@ class FutaPet:
         for item in strips:
             canvas.tag_bind(item, "<ButtonPress-1>", start_move)
             canvas.tag_bind(item, "<B1-Motion>", do_move)
+        for item in (grip_bg, grip_text, grip_hint):
+            canvas.tag_bind(item, "<ButtonPress-1>", start_move)
+            canvas.tag_bind(item, "<B1-Motion>", do_move)
         cursors = {"nw": "size_nw_se", "se": "size_nw_se",
                    "ne": "size_ne_sw", "sw": "size_ne_sw"}
         for name, item in handles.items():
@@ -1246,17 +1261,22 @@ class FutaPet:
         def draw():
             w, h = state["w"], state["h"]
             canvas.configure(width=w, height=h)
-            canvas.coords(strips[0], 0, 0, w, bar)
-            canvas.coords(strips[1], 0, bar, border, h - border)
-            canvas.coords(strips[2], w - border, bar, w, h - border)
-            canvas.coords(strips[3], 0, h - border, w, h)
-            for name, (hx, hy) in {"nw": (8, 8), "ne": (w - 8, 8),
-                                   "sw": (8, h - 8), "se": (w - 8, h - 8)}.items():
-                canvas.coords(handles[name], hx - 9, hy - 9, hx + 9, hy + 9)
-            canvas.coords(title_item, 36, 10)
-            canvas.coords(hint_item, 36, 32)
-            canvas.coords(shot_item, w - 84, 28)
-            canvas.coords(cancel_item, w - 168, 28)
+            canvas.coords(strips[0], 0, 0, w, bar_top)
+            canvas.coords(strips[1], 0, bar_top, border, h - bar_bottom)
+            canvas.coords(strips[2], w - border, bar_top, w, h - bar_bottom)
+            canvas.coords(strips[3], 0, h - bar_bottom, w, h)
+            canvas.coords(grip_bg, max(8, w // 2 - 200), 8, min(w - 8, w // 2 + 200), bar_top - 8)
+            canvas.coords(grip_text, w // 2, 24)
+            canvas.coords(grip_hint, w // 2, 48)
+            canvas.tag_raise(grip_bg)
+            canvas.tag_raise(grip_text)
+            canvas.tag_raise(grip_hint)
+            canvas.coords(shot_item, w - 78, h - bar_bottom // 2)
+            canvas.coords(cancel_item, w - 172, h - bar_bottom // 2)
+            for name, item in handles.items():
+                hx = 10 if "w" in name else w - 10
+                hy = 10 if "n" in name else h - 10
+                canvas.coords(item, hx - 10, hy - 10, hx + 10, hy + 10)
 
         draw()
         self._viewfinder = window
@@ -1364,28 +1384,35 @@ class FutaPet:
 
     def build_polaroid(self, scene, template_key: str = "fuji", sprite=None, caption: bool = False):
         tpl = PHOTO_TEMPLATES.get(template_key, PHOTO_TEMPLATES["fuji"])
-        card_w, card_h = tpl["canvas"]
         bl, bt, br, bb = tpl["border"]
-        photo_w = max(1, card_w - bl - br)
-        photo_h = max(1, card_h - bt - bb)
         if sprite is not None:
-            # 取屏幕中央一块背景，把桌宠放在照片正中：主角永远居中。
+            # 兼容旧路径：以桌宠为中心裁一块 488x536 的背景
             region_h = min(scene.height, max(int(self.pet_height * 2.3), 480))
-            region_w = int(region_h * photo_w / photo_h)
+            region_w = int(region_h * 488 / 536)
             if region_w > scene.width:
                 region_w = scene.width
-                region_h = max(1, int(region_w * photo_h / photo_w))
+                region_h = max(1, int(region_w * 536 / 488))
             left = (scene.width - region_w) // 2
             top = (scene.height - region_h) // 2
-            photo = scene.crop((left, top, left + region_w, top + region_h)).resize(
-                (photo_w, photo_h), Image.Resampling.LANCZOS)
-            factor = photo_w / region_w
-            pet_w = max(1, int(sprite.width * factor))
-            pet_h = max(1, int(sprite.height * factor))
-            pet = sprite.resize((pet_w, pet_h), Image.Resampling.LANCZOS)
-            photo.alpha_composite(pet, ((photo_w - pet_w) // 2, (photo_h - pet_h) // 2))
+            photo_base = scene.crop((left, top, left + region_w, top + region_h)).resize(
+                (488, 536), Image.Resampling.LANCZOS)
+            factor = 488 / region_w
+            pet = sprite.resize((max(1, int(sprite.width * factor)),
+                                 max(1, int(sprite.height * factor))),
+                                Image.Resampling.LANCZOS)
+            photo_base.alpha_composite(pet, ((488 - pet.width) // 2,
+                                             (536 - pet.height) // 2))
         else:
-            photo = self.cover_crop(scene, photo_w, photo_h)
+            photo_base = scene
+        # 关键：按取景框比例缩放，不裁切，取景框里看到什么就拍下什么
+        max_w, max_h = 520, 560
+        scale = min(1.0, max_w / photo_base.width, max_h / photo_base.height)
+        photo = photo_base.resize((max(1, int(photo_base.width * scale)),
+                                   max(1, int(photo_base.height * scale))),
+                                  Image.Resampling.LANCZOS)
+        photo_w, photo_h = photo.size
+        card_w = photo_w + bl + br
+        card_h = photo_h + bt + bb
         card = Image.new("RGB", (card_w, card_h), tpl["bg"])
         card.paste(photo.convert("RGB"), (bl, bt))
         draw = ImageDraw.Draw(card)
@@ -1402,8 +1429,8 @@ class FutaPet:
             now = datetime.datetime.now()
             draw.text((bl, bt + photo_h + 26), now.strftime("%Y-%m-%d  %H:%M"),
                       fill=tpl["text"], font=font_small)
-            caption = "福塔 3.1" if self.theme == "futa" else "福塔 3.1 · " + THEMES[self.theme]["name"]
-            draw.text((bl, bt + photo_h + 58), caption, fill=tpl["text"], font=font_big)
+            caption_text = "福塔 3.1" if self.theme == "futa" else "福塔 3.1 · " + THEMES[self.theme]["name"]
+            draw.text((bl, bt + photo_h + 58), caption_text, fill=tpl["text"], font=font_big)
         return card
 
     def show_photo_preview(self, scene, sprite=None) -> None:
@@ -1622,6 +1649,9 @@ class FutaPet:
             return random.choice(SPEECH["asleep"])
         if self.sleep_state == "sleepy":
             return random.choice(SPEECH["sleepy"])
+        theme_lines = THEME_SAYINGS.get(self.theme)
+        if theme_lines and random.random() < 0.78:
+            return random.choice(theme_lines)
         hour = datetime.datetime.now().hour
         if (hour >= NIGHT_START_HOUR or hour < NIGHT_END_HOUR) and random.random() < 0.5:
             return random.choice(SPEECH["night"])
